@@ -95,3 +95,32 @@ def test_score_is_scheme_invariant(rest):
     assert plain["score"] == http["score"] == https["score"]
     assert https["uses_https"] and not http["uses_https"]
     assert not any("HTTPS" in r for r in https["reasons"])
+
+
+# --- rule layer (brand impersonation + attack payloads) --------------------------------------
+@needs_model
+def test_rules_raise_score_but_never_lower_it():
+    from src.scoring import score_url
+    for url in ["www.g00gle.com", "example.com/index.php?page=../../../../etc/passwd", "github.com/login",
+                "http://192.168.43.10/bins/mozi.arm7"]:
+        r = score_url(url)
+        assert r["score"] == pytest.approx(max(r["ml_score"], r["rule_floor"]), abs=0.05)
+        assert r["score"] >= r["ml_score"] - 0.05
+
+
+@needs_model
+def test_typosquat_and_traversal_are_flagged():
+    from src.scoring import score_url
+    sq = score_url("www.g00gle.com")
+    assert sq["score"] >= 8.0 and sq["type"] == "phishing" and sq["rule_findings"][0]["family"] == "brand"
+    lfi = score_url("www.ncuindia.edu/../../etc/passwd")
+    assert lfi["score"] >= 9.0 and lfi["type"] == "attack payload"
+    assert score_url("example.com/index.php?page=../../../../etc/passwd")["score"] >= 9.0
+
+
+@needs_model
+@pytest.mark.parametrize("url", ["www.google.com/search?q=weather", "github.com/login", "en.wikipedia.org/wiki/Phishing"])
+def test_legitimate_urls_get_no_rule_findings(url):
+    from src.scoring import score_url
+    r = score_url(url)
+    assert r["rule_findings"] == [] and r["score"] < 5

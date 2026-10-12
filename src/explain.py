@@ -80,6 +80,19 @@ def feature_sentence(name: str, value: float) -> str:
         "tld_length": f"top-level domain is {v} characters long",
         "is_shortener": "is a URL-shortener link (hides the real destination)" if v else "is not a shortener link",
         "url_entropy": f"URL looks {'random' if value >= 4.5 else 'fairly regular'} (character entropy {value:.2f})",
+        "brand_homoglyph": "domain imitates a known brand with look-alike characters" if v
+        else "domain does not imitate a brand with look-alike characters",
+        "brand_typosquat": "domain is a misspelling of a known brand" if v
+        else "domain is not a misspelling of a known brand",
+        "brand_combosquat": "domain combines a brand name with other words" if v
+        else "domain does not combine a brand name with other words",
+        "brand_in_subdomain": "a brand name appears in the subdomain of an unrelated domain" if v
+        else "no brand name in the subdomain",
+        "brand_in_path": "a brand name appears in the path of an unrelated domain" if v
+        else "no brand name in the path",
+        "has_punycode": "domain uses punycode (xn--), which can hide look-alike characters" if v
+        else "domain does not use punycode",
+        "non_ascii_host": "domain contains non-Latin characters" if v else "domain uses only Latin characters",
     }
     return templates[name]
 

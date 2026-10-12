@@ -25,6 +25,8 @@ from urllib.parse import urlsplit
 import pandas as pd
 import tldextract
 
+from src.brands import analyze as brand_signals
+
 ROOT = Path(__file__).resolve().parent.parent
 PROCESSED = ROOT / "data" / "processed"
 
@@ -42,6 +44,10 @@ SHORTENERS = {
     "rebrand.ly", "shorturl.at", "tiny.cc", "rb.gy", "t.ly", "s.id", "v.gd", "qrco.de", "lnkd.in", "db.tt",
 }
 
+# Brand-impersonation signals from src/brands.py (typosquatting family).
+BRAND_FEATURES = ["brand_homoglyph", "brand_typosquat", "brand_combosquat", "brand_in_subdomain",
+                  "brand_in_path", "has_punycode", "non_ascii_host"]
+
 FEATURE_NAMES = [
     "url_length", "domain_length", "path_length", "query_length",
     "num_dots", "num_hyphens", "num_digits", "digit_ratio", "num_special_chars",
@@ -49,6 +55,7 @@ FEATURE_NAMES = [
     "has_ip", "num_subdomains", "has_https",
     *[f"kw_{k}" for k in SUSPICIOUS_KEYWORDS], "num_suspicious_keywords",
     "suspicious_tld", "tld_length", "is_shortener", "url_entropy",
+    *BRAND_FEATURES,
 ]
 
 
@@ -79,8 +86,8 @@ def _entropy(s: str) -> float:
     return -sum(c / n * math.log2(c / n) for c in Counter(s).values())
 
 
-def extract_features(url: str) -> dict:
-    """Return a dict of numeric, human-readable features (keys == FEATURE_NAMES)."""
+def split_url(url: str) -> tuple[str, str, str, str, str]:
+    """(scheme, body-without-scheme, host, path, query) for a URL string; never fetches."""
     url = str(url).strip()
     scheme, body = _strip_scheme(url)
     try:
@@ -91,6 +98,12 @@ def extract_features(url: str) -> dict:
         host, _, rest = body.partition("/")
         host = host.split(":")[0].lower()
         path, _, query = ("/" + rest).partition("?")
+    return scheme, body, host, path, query
+
+
+def extract_features(url: str) -> dict:
+    """Return a dict of numeric, human-readable features (keys == FEATURE_NAMES)."""
+    scheme, body, host, path, query = split_url(url)
 
     ext = _EXTRACT(host)
     is_ip = _is_ip(host)
@@ -124,6 +137,11 @@ def extract_features(url: str) -> dict:
         "is_shortener": int(reg in SHORTENERS or host in SHORTENERS),
         "url_entropy": _entropy(body),
     }
+    if is_ip or not host:
+        f.update({k: 0 for k in BRAND_FEATURES})
+    else:
+        b = brand_signals(host, path + ("?" + query if query else ""))
+        f.update({k: b[k] for k in BRAND_FEATURES})
     return f
 
 

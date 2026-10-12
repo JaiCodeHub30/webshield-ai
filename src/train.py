@@ -40,11 +40,11 @@ from src.features import MODEL_FEATURES
 ROOT = Path(__file__).resolve().parent.parent
 PROCESSED = ROOT / "data" / "processed"
 MODELS = ROOT / "models"
-REPORTS = ROOT / "reports" / "model_v3"
+REPORTS = ROOT / "reports" / "model_v4"
 # Class index order = label_map.json (benign=0, phishing=1, malware=2, defacement=3).
 LABELS = [INV_LABEL_MAP[i] for i in range(len(LABEL_MAP))]
 RANDOM_STATE = 42
-MODEL_VERSION = "v3-combined-dataset"
+MODEL_VERSION = "v4-brand-features"
 VAL_SIZE = 0.15
 
 
