@@ -1,0 +1,15 @@
+pandas
+numpy
+scikit-learn
+xgboost
+shap
+tldextract
+joblib
+python-dotenv
+streamlit
+requests
+matplotlib
+seaborn
+jupyter
+openpyxl
+pytest
