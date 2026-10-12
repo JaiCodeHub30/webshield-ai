@@ -19,7 +19,7 @@ EXAMPLES = [
 
 if __name__ == "__main__":
     lines = ["# Phase 4: example ML-only scores", "",
-             "Hand-written example URLs (not from the training data; never fetched).", ""]
+             "Hand-written example URLs (not from the training data; never fetched). Model: v2-no-https.", ""]
     for url in EXAMPLES:
         t = time.time()
         r = score_url(url)

@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import shap
 
-from src.features import FEATURE_NAMES, SUSPICIOUS_KEYWORDS, extract_features
+from src.features import MODEL_FEATURES, SUSPICIOUS_KEYWORDS, extract_features
 
 ROOT = Path(__file__).resolve().parent.parent
 MODEL_PATH = ROOT / "models" / "webshield_model.joblib"
@@ -27,7 +27,7 @@ MIN_CONTRIBUTION = 0.05  # ignore features moving the risk by < 0.05 points (on 
 @lru_cache(maxsize=1)
 def load_bundle(path: Path = MODEL_PATH) -> dict:
     bundle = joblib.load(path)
-    assert bundle["features"] == FEATURE_NAMES, "model was trained on a different feature set"
+    assert bundle["features"] == MODEL_FEATURES, "model was trained on a different feature set; retrain"
     return bundle
 
 
@@ -93,7 +93,7 @@ def explain_features(features: dict, top_k: int = 5) -> list[dict]:
     from src.scoring import RISK_WEIGHTS  # local import: scoring imports this module
 
     bundle = load_bundle()
-    X = pd.DataFrame([features], columns=FEATURE_NAMES)
+    X = pd.DataFrame([features], columns=MODEL_FEATURES)
     sv = shap_values_3d(get_explainer(), X)[0]  # (n_features, n_classes)
     weights = np.array([RISK_WEIGHTS[label] for label in bundle["labels"]])
     risk_contrib = 10 * sv @ weights  # (n_features,)
@@ -104,7 +104,7 @@ def explain_features(features: dict, top_k: int = 5) -> list[dict]:
         c = float(risk_contrib[i])
         if abs(c) < MIN_CONTRIBUTION:
             break
-        name = FEATURE_NAMES[i]
+        name = MODEL_FEATURES[i]
         out.append({
             "feature": name,
             "value": features[name],

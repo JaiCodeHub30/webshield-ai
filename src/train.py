@@ -34,7 +34,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.utils.class_weight import compute_sample_weight
 from xgboost import XGBClassifier
 
-from src.features import FEATURE_NAMES
+from src.features import MODEL_FEATURES
 
 ROOT = Path(__file__).resolve().parent.parent
 PROCESSED = ROOT / "data" / "processed"
@@ -42,13 +42,15 @@ MODELS = ROOT / "models"
 REPORTS = ROOT / "reports" / "phase3"
 LABELS = ["benign", "phishing", "malware", "defacement"]  # class index order
 RANDOM_STATE = 42
+MODEL_VERSION = "v2-no-https"
 VAL_SIZE = 0.15
 
 
 def load(split: str):
     df = pd.read_csv(PROCESSED / f"features_{split}.csv")
     y = df["type"].map({l: i for i, l in enumerate(LABELS)}).to_numpy()
-    return df[FEATURE_NAMES], y, df["domain"].to_numpy()
+    assert "has_https" not in df.columns, "rebuild matrices: has_https must not be a model input"
+    return df[MODEL_FEATURES], y, df["domain"].to_numpy()
 
 
 def make_models() -> dict:
@@ -152,7 +154,8 @@ def main():
     plot_confusion(c["confusion_matrix"], f"calibrated {best} (test)", REPORTS / "confusion_calibrated.png")
     plot_calibration(y_test, proba_raw, proba_cal, REPORTS / "calibration_curve.png")
 
-    joblib.dump({"model": calibrated, "labels": LABELS, "features": FEATURE_NAMES, "base_model": best},
+    joblib.dump({"model": calibrated, "labels": LABELS, "features": MODEL_FEATURES, "base_model": best,
+                 "version": MODEL_VERSION},
                 MODELS / "webshield_model.joblib", compress=3)
     for name, model in fitted.items():
         joblib.dump(model, MODELS / f"{name}_uncalibrated.joblib", compress=3)

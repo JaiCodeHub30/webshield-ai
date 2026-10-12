@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from src.explain import explain_features, load_bundle
-from src.features import FEATURE_NAMES, extract_features
+from src.features import MODEL_FEATURES, extract_features
 
 RISK_WEIGHTS = {"benign": 0.0, "phishing": 0.9, "malware": 1.0, "defacement": 0.5}
 
@@ -25,7 +25,7 @@ def ml_score(probabilities: dict) -> float:
 
 def predict_probabilities(features: dict) -> dict:
     bundle = load_bundle()
-    X = pd.DataFrame([features], columns=FEATURE_NAMES)
+    X = pd.DataFrame([features], columns=MODEL_FEATURES)
     proba = bundle["model"].predict_proba(X)[0]
     return {label: float(p) for label, p in zip(bundle["labels"], proba)}
 
@@ -42,6 +42,7 @@ def score_url(url: str, top_k: int = 5) -> dict:
         "type": url_type,
         "confidence": round(probs[url_type], 3),
         "probabilities": {k: round(v, 3) for k, v in probs.items()},
+        "uses_https": bool(features["has_https"]),  # display only; not a model input
         "reasons": [e["sentence"] for e in explanation],
         "explanation": explanation,
     }

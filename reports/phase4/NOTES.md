@@ -16,8 +16,12 @@
 - Per URL: ~1.0 s, almost entirely exact TreeSHAP over 200 deep trees (`min_samples_leaf=5`). First call ~3 s (warm-up).
 - Acceptable for single-URL lookups in the UI; too slow for bulk explanation. Options if needed: explain only on demand, `shap.TreeExplainer(..., feature_perturbation="tree_path_dependent")` with shallower trees, or explain the XGBoost model (much faster).
 
-## Known model issue (from Phase 2/3, not fixed here)
-`has_https` acts as a dataset artifact. In the Kaggle data ~92% of benign URLs have no scheme, so `https` almost only appears on malicious rows. Result: legitimate HTTPS URLs get high scores (examples: `https://www.google.com/...` 6.4, `https://docs.python.org/...` 8.2) with "Uses HTTPS" as the top reason.
-Recommended fix (needs a Phase 3 retrain on training data only): drop `has_https` from the model features (keep it for display), retrain, recalibrate. The Phase 5 fresh evaluation would otherwise be distorted, since OpenPhish/Tranco URLs all carry schemes.
+## Model version
+These notes and `examples.md` are for model **v2-no-https** (see `reports/CHANGELOG.md`). `has_https` is display-only and never appears as a reason. v1 outputs are archived in `reports/archive/v1_with_https/`.
 
-Other observations: obvious keyword/TLD phishing (`...secure-login.tk/signin/update.php`) only scores 3.6, and the `bit.ly` shortener flag barely registers (very few shorteners in training data).
+## Current weaknesses seen in the examples (v2)
+- **Bare domains:** `google.com` scores 9.0 (phishing): "Path is 0 characters long" is the top reason. Kaggle phishing URLs are often bare domains while benign ones mostly have paths. Needs fixing before Phase 5 Tranco evaluation (e.g. drop/transform path features or add benign bare-domain training examples).
+- **Dot count:** `docs.python.org/3/library/urllib.parse.html` scores 6.1 because "URL has 4 dots" raises risk.
+- **Look-alike phishing** scores only mid-range (4.1-4.8): keywords and abused TLDs help but are weak in this data.
+- **Shorteners** are inconsistent (`tinyurl.com/...` 1.9, `bit.ly/...` 6.0, `t.co/...` 6.7), driven by 2-letter TLD and length rather than the shortener flag, which is rare in training data.
+- **Raw-IP URLs** score 9.7-10.0 (malware) as intended.

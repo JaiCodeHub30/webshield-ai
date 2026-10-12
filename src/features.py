@@ -8,6 +8,11 @@ Dataset artifact: in the Kaggle data almost every defacement/malware URL carries
 "has a scheme = malicious", every feature except `has_https` is computed on the URL with
 the scheme removed, and scheme presence itself is not a feature.
 
+`has_https` is still extracted (FEATURE_NAMES) for display, but it is DISPLAY-ONLY: it is
+excluded from MODEL_FEATURES, the saved matrices and the model. With it, v1 of the model
+learned "https = phishing" (https almost never appears on benign Kaggle rows) and scored
+https://www.google.com as 6.4/10. See reports/CHANGELOG.md.
+
 Run: python -m src.features   (builds feature matrices from data/processed/{train,test}.csv)
 """
 import ipaddress
@@ -45,6 +50,11 @@ FEATURE_NAMES = [
     *[f"kw_{k}" for k in SUSPICIOUS_KEYWORDS], "num_suspicious_keywords",
     "suspicious_tld", "tld_length", "is_shortener", "url_entropy",
 ]
+
+
+# Extracted but never fed to the model (dataset artifacts); shown to users only.
+DISPLAY_ONLY_FEATURES = ["has_https"]
+MODEL_FEATURES = [f for f in FEATURE_NAMES if f not in DISPLAY_ONLY_FEATURES]
 
 
 def _strip_scheme(url: str) -> tuple[str, str]:
@@ -117,12 +127,12 @@ def extract_features(url: str) -> dict:
     return f
 
 
-def build_matrix(urls) -> pd.DataFrame:
-    return pd.DataFrame([extract_features(u) for u in urls], columns=FEATURE_NAMES)
+def build_matrix(urls, columns=MODEL_FEATURES) -> pd.DataFrame:
+    return pd.DataFrame([extract_features(u) for u in urls], columns=columns)
 
 
 def validate(X: pd.DataFrame, n_rows: int) -> None:
-    assert list(X.columns) == FEATURE_NAMES, "feature columns out of order"
+    assert list(X.columns) == MODEL_FEATURES, "feature columns out of order"
     assert len(X) == n_rows, "row count mismatch"
     assert not X.isna().any().any(), "NaN in features"
     assert all(pd.api.types.is_numeric_dtype(t) for t in X.dtypes), "non-numeric feature"
@@ -138,7 +148,7 @@ def main():
         out = pd.concat([X, df[["type", "domain"]]], axis=1)
         out.to_csv(PROCESSED / f"features_{split}.csv", index=False)
         print(f"{split}: {out.shape} -> features_{split}.csv")
-        print(X.groupby(df["type"])[["url_length", "num_digits", "has_ip", "has_https",
+        print(X.groupby(df["type"])[["url_length", "num_digits", "has_ip",
                                       "num_suspicious_keywords", "suspicious_tld", "url_entropy"]].mean().round(3))
 
 

@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from src.explain import MODEL_PATH, feature_sentence
-from src.features import FEATURE_NAMES, SUSPICIOUS_KEYWORDS, extract_features
+from src.features import FEATURE_NAMES, MODEL_FEATURES, SUSPICIOUS_KEYWORDS, extract_features
 from src.scoring import RISK_WEIGHTS, ml_score
 
 needs_model = pytest.mark.skipif(not MODEL_PATH.exists(), reason="trained model not present (run src.train)")
@@ -48,7 +48,9 @@ def test_every_feature_has_a_sentence():
 def test_model_feature_alignment():
     from src.explain import load_bundle
     b = load_bundle()
-    assert b["features"] == FEATURE_NAMES
+    assert b["features"] == MODEL_FEATURES
+    assert "has_https" not in b["features"]
+    assert b["model"].n_features_in_ == len(MODEL_FEATURES)
     assert set(b["labels"]) == set(RISK_WEIGHTS)
 
 
@@ -62,7 +64,7 @@ def test_score_url_output(url):
     assert sum(r["probabilities"].values()) == pytest.approx(1.0, abs=0.01)
     assert r["confidence"] == max(r["probabilities"].values())
     for e in r["explanation"]:
-        assert e["feature"] in FEATURE_NAMES
+        assert e["feature"] in MODEL_FEATURES  # display-only features never appear as reasons
         assert e["value"] == extract_features(url)[e["feature"]]  # explanation describes THIS url
     assert len(r["reasons"]) == len(r["explanation"]) <= 5
 
@@ -73,10 +75,23 @@ def test_shap_risk_contributions_are_additive():
     from src.explain import base_estimator, get_explainer, load_bundle, shap_values_3d
     b = load_bundle()
     f = extract_features("http://paypal-secure-verify.tk/account/login?id=123456")
-    X = pd.DataFrame([f], columns=FEATURE_NAMES)
+    X = pd.DataFrame([f], columns=MODEL_FEATURES)
     w = np.array([RISK_WEIGHTS[label] for label in b["labels"]])
     ex = get_explainer()
     contrib = 10 * shap_values_3d(ex, X)[0] @ w
     base = 10 * np.asarray(ex.expected_value) @ w
     model_risk = 10 * base_estimator(b["model"]).predict_proba(X)[0] @ w
     assert contrib.sum() + base == pytest.approx(model_risk, abs=1e-6)
+
+
+@needs_model
+@pytest.mark.parametrize("rest", ["www.google.com/search?q=weather", "docs.python.org/3/library/urllib.parse.html",
+                                  "198.51.100.23:8080/Photo.scr"])
+def test_score_is_scheme_invariant(rest):
+    """Scheme must not move the score (v1 learned https = phishing from a Kaggle artifact)."""
+    from src.scoring import score_url
+    plain, http, https = (score_url(p + rest) for p in ("", "http://", "https://"))
+    assert plain["probabilities"] == http["probabilities"] == https["probabilities"]
+    assert plain["score"] == http["score"] == https["score"]
+    assert https["uses_https"] and not http["uses_https"]
+    assert not any("HTTPS" in r for r in https["reasons"])

@@ -1,6 +1,6 @@
 import math
 
-from src.features import FEATURE_NAMES, extract_features
+from src.features import DISPLAY_ONLY_FEATURES, FEATURE_NAMES, MODEL_FEATURES, build_matrix, extract_features
 
 
 def test_keys_match_feature_names():
@@ -53,3 +53,15 @@ def test_entropy_and_empty():
 def test_malformed_url_does_not_raise():
     extract_features("http://[broken/path")
     extract_features("   ")
+
+
+def test_https_is_display_only():
+    assert "has_https" in FEATURE_NAMES and "has_https" in DISPLAY_ONLY_FEATURES
+    assert "has_https" not in MODEL_FEATURES
+    assert MODEL_FEATURES == [f for f in FEATURE_NAMES if f != "has_https"]
+    assert list(build_matrix(["https://example.com"]).columns) == MODEL_FEATURES
+
+
+def test_model_features_scheme_invariant():
+    rows = build_matrix(["example.com/a?b=1", "http://example.com/a?b=1", "https://example.com/a?b=1"])
+    assert (rows.nunique() == 1).all()
