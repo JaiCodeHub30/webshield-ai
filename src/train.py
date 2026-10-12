@@ -34,21 +34,24 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.utils.class_weight import compute_sample_weight
 from xgboost import XGBClassifier
 
+from src.build_dataset import INV_LABEL_MAP, LABEL_MAP
 from src.features import MODEL_FEATURES
 
 ROOT = Path(__file__).resolve().parent.parent
 PROCESSED = ROOT / "data" / "processed"
 MODELS = ROOT / "models"
-REPORTS = ROOT / "reports" / "phase3"
-LABELS = ["benign", "phishing", "malware", "defacement"]  # class index order
+REPORTS = ROOT / "reports" / "model_v3"
+# Class index order = label_map.json (benign=0, phishing=1, malware=2, defacement=3).
+LABELS = [INV_LABEL_MAP[i] for i in range(len(LABEL_MAP))]
 RANDOM_STATE = 42
-MODEL_VERSION = "v2-no-https"
+MODEL_VERSION = "v3-combined-dataset"
 VAL_SIZE = 0.15
 
 
 def load(split: str):
     df = pd.read_csv(PROCESSED / f"features_{split}.csv")
-    y = df["type"].map({l: i for i, l in enumerate(LABELS)}).to_numpy()
+    assert pd.api.types.is_integer_dtype(df["type"]), "expected integer labels from build_dataset"
+    y = df["type"].to_numpy()
     assert "has_https" not in df.columns, "rebuild matrices: has_https must not be a model input"
     return df[MODEL_FEATURES], y, df["domain"].to_numpy()
 
